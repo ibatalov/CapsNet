@@ -16,7 +16,7 @@ class Capsule():
         self.activation = activation
     
     # input tensor shape: [batch_size, in_caps_n, in_caps_dim]
-    def build(self, input_tensor):
+    def __call__(self, input_tensor):
         input_shape = input_tensor.shape
         batch_size = tf.shape(input_tensor)[0]
         in_caps_n = input_tensor.shape[1].value
