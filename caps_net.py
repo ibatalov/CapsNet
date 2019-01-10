@@ -57,18 +57,17 @@ class Capsule():
         
         # agreement by routing
         # initialize all weights to zero, making the final weights equal to 1/self.num_capsules
-        raw_weights = tf.zeros([batch_size, in_caps_n, self.num_capsules, 1, 1],
+        raw_weights = tf.zeros([batch_size, in_caps_n, self.num_capsules, 1],
                        dtype=np.float32, name="raw_weights")
         routing_weights = tf.nn.softmax(raw_weights, axis=2, name="routing_weights")
         # routing_weights will be broadcasted here from 1 to out_caps_dim in the dimension 3
-        # shape [batch_size, in_caps_n, out_caps_n, out_caps_dim, 1]
-        weighted_predictions = tf.multiply(routing_weights, u_predicted, name="weighted_predictions")
         # shape [batch_size, 1, out_caps_n, out_caps_dim, 1]
-        weighted_sum = tf.reduce_sum(weighted_predictions, axis=1, keep_dims=True, name="weighted_sum")
+        weighted_sum = tf.reduce_sum(routing_weights * u_predicted, axis=1, keep_dims=True, name="weighted_sum")
+        #weighted_sum = tf.reduce_sum(weighted_predictions, axis=1, keep_dims=True, name="weighted_sum")
         # Applying activation function to the calculated tensor to produce this iteration's capsule output
         # squash doesn't change the shape of the tensor
         # shape [batch_size, 1, out_caps_n, out_caps_dim, 1]
-        capsule_output = self.activation(weighted_sum, axis=-2, name="capsule_output")
+        capsule_output = self.activation(weighted_sum, axis=3, name="capsule_output")
         
         counter = tf.constant(0)
 
@@ -78,20 +77,16 @@ class Capsule():
         def loop_body(raw_weights, capsule_output, counter): 
             # replicating output tensor to make it compatible with the shape of the predicted output tensor
             # shape [batch_size, in_caps_n, out_caps_n, out_caps_dim, 1]
-            capsule_output_tiled = tf.tile(capsule_output, [1, in_caps_n, 1, 1, 1], name="capsule_output_tiled")
-            # dot product between capsule output and the predicted output
-            # transposing the last two dimensions of the first tensor to make it:
-            # [1, out_caps_dim], which will be multiplied by [out_caps_dim, 1], producing a scalar
+            #capsule_output_tiled = tf.tile(capsule_output, [1, in_caps_n, 1, 1, 1], name="capsule_output_tiled")
+            
             # shape [batch_size, in_caps_n, out_caps_n, 1, 1]
-            agreement = tf.matmul(u_predicted, capsule_output_tiled, transpose_a=True, name="agreement")
+            agreement = tf.reduce_sum(u_predicted * capsule_output, axis=3, keep_dims=True)
+            
             # shape [batch_size, in_caps_n, out_caps_n, 1, 1]
             raw_weights = tf.add(raw_weights, agreement, name="raw_weights")
             routing_weights = tf.nn.softmax(raw_weights, axis=2, name="routing_weights")
-            # routing_weights will be broadcasted here from 1 to out_caps_dim in the dimension 3
-            # shape [batch_size, in_caps_n, out_caps_n, out_caps_dim, 1]
-            weighted_predictions = tf.multiply(routing_weights, u_predicted, name="weighted_predictions")
             # shape [batch_size, 1, out_caps_n, out_caps_dim, 1]
-            weighted_sum = tf.reduce_sum(weighted_predictions, axis=1, keep_dims=True, name="weighted_sum")
+            weighted_sum = tf.reduce_sum(routing_weights * u_predicted, axis=1, keep_dims=True, name="weighted_sum")
             # Applying activation function to the calculated tensor to produce this iteration's capsule output
             # squash doesn't change the shape of the tensor
             # shape [batch_size, 1, out_caps_n, out_caps_dim, 1]
